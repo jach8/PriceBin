@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 import logging
 from ..indicators import Indicators
-from ..backtest.PortfolioStats import PortfolioStats
-from ..backtest.simulator import MarketSim
+from ..backtesting.PortfolioStats import PortfolioStats
+from ..backtesting.simulator import MarketSim
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
