@@ -61,10 +61,14 @@ class Manager:
 	def removeStock(self, stock):  
 		with sqlite3.connect(self.connection_paths['stock_names']) as conn: 
 			delete_stock(conn, self.connection_paths['ticker_path'], stock)
+   
+	def update_stock_prices(self):
+		self.Pricedb.update_stocks()  
 
 	
 if __name__ == "__main__":
     m = Manager()
+    m.update_stock_prices()
     m.close_connection()
  
  
