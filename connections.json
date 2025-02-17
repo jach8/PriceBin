@@ -1,0 +1,6 @@
+{   
+    "daily_db": "src/data/stocks.db", 
+    "intraday_db": "src/data/stocks_intraday.db",
+    "ticker_path": "src/data/tickers.json",
+    "stock_names" : "src/data/stock_names.db"
+}
