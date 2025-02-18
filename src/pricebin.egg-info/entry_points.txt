@@ -1,0 +1,2 @@
+[console_scripts]
+pricebin-init = pricebin.Initialize:Initialize
