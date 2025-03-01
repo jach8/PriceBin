@@ -135,6 +135,7 @@ class UpdateStocks:
                     logger.info('Database tables are empty, fetching all data')
                     data = yf.download(stock_symbols, start="1900-01-01")
                 else:
+                    # data = yf.download(stock_symbols, start="1900-01-01")
                     data = yf.download(stock_symbols, start=latest_date)
                 
                 if data.empty:

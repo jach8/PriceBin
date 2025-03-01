@@ -10,7 +10,6 @@ from typing import List, Dict, Union, Optional
 from src.db_connect import Prices
 from src.report import perf as performance
 from src.utils import add_stock, delete_stock
-from src.strategy_testing.base_strategy import BaseStrategy
  
 
 def init():
@@ -66,28 +65,7 @@ class Manager:
 	def update_stock_prices(self):
 		self.Pricedb.update_stocks()  
 
-	def test_strategy(self, strategy: BaseStrategy, start_date: str, end_date: str, initial_capital: float):
-		"""Test a trading strategy using historical price data.
-		
-		Args:
-			strategy: Trading strategy instance
-			start_date: Start date for backtest
-			end_date: End date for backtest
-			initial_capital: Initial capital for trading
-		
-		Returns:
-			performance_stats: Dictionary of performance statistics
-		"""
-		# Get historical price data
-		data = self.Pricedb.get_historical_prices(start_date, end_date)
-		
-		# Prepare data and initialize strategy
-		strategy.prepare_data(data)
-		
-		# Run backtest
-		performance_stats = self.performance.run_backtest(strategy, initial_capital)
-		
-		return performance_stats
+
 	
 if __name__ == "__main__":
     m = Manager()

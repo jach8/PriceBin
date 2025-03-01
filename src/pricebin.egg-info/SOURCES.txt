@@ -1,8 +1,0 @@
-README.md
-setup.py
-src/pricebin.egg-info/PKG-INFO
-src/pricebin.egg-info/SOURCES.txt
-src/pricebin.egg-info/dependency_links.txt
-src/pricebin.egg-info/entry_points.txt
-src/pricebin.egg-info/requires.txt
-src/pricebin.egg-info/top_level.txt
