@@ -58,7 +58,6 @@ class volatility:
             raise ValueError('Data must be sorted by date')
         if not len(df) > 0:
             raise ValueError('Data must contain at least one row')
-
         return df
     
     def historical_volatility(self, df: pd.DataFrame, window: int = 30) -> pd.Series:
@@ -210,7 +209,7 @@ if __name__ == "__main__":
 
     connections = get_path()
     m = Manager(connections)
-    df = m.Pricedb.ohlc('spy').resample('10D').last()
+    df = m.Pricedb.ohlc('spy', daily=False).resample('3T').last()
 
     v = volatility()
     df = v._validate_dataframe(df) 

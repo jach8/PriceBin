@@ -299,12 +299,12 @@ if __name__ == "__main__":
     ma = moving_avg()
     
     # Get sample data
-    df = m.Pricedb.ohlc('spy', daily=False, start="2025-01-10")
+    df = m.Pricedb.ohlc('spy', daily=False, start="2025-01-10").drop_duplicates()
     daily_df = m.Pricedb.ohlc('spy', daily=True)
     
     # Generate MA ribbons
-    intraday_ribbon = ma.ribbon(df, ma='kama')
-    daily_ribbon = ma.ribbon(daily_df, ma='ema')
+    intraday_ribbon = ma.ribbon(df, ma='wma')
+    daily_ribbon = ma.ribbon(daily_df, ma='wma')
     
     # Combine timeframes
     combined = ma.concatenate_min_daily(intraday_ribbon, daily_ribbon)
