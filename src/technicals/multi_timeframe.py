@@ -118,9 +118,9 @@ class MultiTimeframeMA(moving_avg):
 
 if __name__ == "__main__":
     import sys
-    sys.path.append('/Users/jerald/Documents/Dir/Python/Stocks')
-    from main import Pipeline as Manager
-    from bin.main import get_path
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from main import Manager, get_path
     
     # Initialize objects
     connections = get_path()
@@ -128,8 +128,8 @@ if __name__ == "__main__":
     mtf = MultiTimeframeMA()
     
     # Get sample data
-    min_df = m.Pricedb.ohlc('aapl', daily=False, start="2025-02-01")
-    daily_df = m.Pricedb.ohlc('aapl', daily=True, start="2025-02-01")
+    min_df = m.Pricedb.ohlc('spy', daily=False, start="2025-02-01")
+    daily_df = m.Pricedb.ohlc('spy', daily=True, start="2025-02-01")
     
     # Generate signals using both timeframes
     signals = mtf.generate_signals(

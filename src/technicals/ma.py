@@ -1,4 +1,5 @@
-"""Moving Averages Signals.
+"""
+Moving Averages Signals.
 
 This module implements technical analysis tools for calculating and analyzing
 moving averages on financial time series data.
@@ -288,9 +289,9 @@ class moving_avg:
 
 if __name__ == "__main__":
     import sys
-    sys.path.append('/Users/jerald/Documents/Dir/Python/Stocks')
-    from main import Pipeline as Manager
-    from bin.main import get_path
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from main import Manager, get_path
 
     # Initialize
     connections = get_path()
@@ -298,8 +299,8 @@ if __name__ == "__main__":
     ma = moving_avg()
     
     # Get sample data
-    df = m.Pricedb.ohlc('aapl', daily=False, start="2025-01-10")
-    daily_df = m.Pricedb.ohlc('aapl', daily=True)
+    df = m.Pricedb.ohlc('spy', daily=False, start="2025-01-10")
+    daily_df = m.Pricedb.ohlc('spy', daily=True)
     
     # Generate MA ribbons
     intraday_ribbon = ma.ribbon(df, ma='kama')

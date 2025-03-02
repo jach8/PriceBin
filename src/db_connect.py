@@ -246,7 +246,7 @@ class Prices(UpdateStocks):
         try:
             if daily:
                 q = f'''select date(date) as "Date", open, high, low, close, volume from {stock} order by date(date) asc'''
-                db_type = 'daily'
+                db_type = 'daily_db'
             else:
                 if start is None:
                     q = f'''select datetime(date) as "Date", open, high, low, close, volume from {stock} order by datetime(date) asc'''
@@ -263,7 +263,7 @@ class Prices(UpdateStocks):
                     where
                         date(date) >= date("{start}")
                     order by datetime(date) asc'''
-                db_type = 'intraday'
+                db_type = 'intraday_db'
                 
             with self._get_connection(db_type) as conn:
                 cursor = conn.cursor()

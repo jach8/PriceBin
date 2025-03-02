@@ -69,7 +69,6 @@ class Manager:
 	
 if __name__ == "__main__":
     m = Manager()
-    m.update_stock_prices()
     m.close_connection()
  
  

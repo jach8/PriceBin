@@ -74,131 +74,9 @@ class Indicators:
         except Exception as e:
             logger.error(f"Error fitting price data: {str(e)}")
             raise
-            
-    def est_vol(self, lookback: int = 10) -> np.ndarray:
-        """ 
-        This is the Yang-Zheng (2005) Estimator for Volatility; 
-            Yang Zhang is a historical volatility estimator that handles 
-                1. opening jumps
-                2. the drift and has a minimum estimation error 
-        """
-        try:
-            o = self.open
-            h = self.high
-            l = self.low
-            c = self.price
-            k = 0.34 / (1.34 + (lookback+1)/(lookback-1))
-            cc = np.log(c/c.shift(1))
-            ho = np.log(h/o)
-            lo = np.log(l/o)
-            co = np.log(c/o)
-            oc = np.log(o/c.shift(1))
-            oc_sq = oc**2
-            cc_sq = cc**2
-            rs = ho*(ho-co)+lo*(lo-co)
-            close_vol = cc_sq.rolling(window=lookback).sum() * (1.0 / (lookback - 1.0))
-            open_vol = oc_sq.rolling(window=lookback).sum() * (1.0 / (lookback - 1.0))
-            window_rs = rs.rolling(window=lookback).sum() * (1.0 / (lookback - 1.0))
-            result = (open_vol + k * close_vol + (1-k) * window_rs).apply(np.sqrt) * np.sqrt(252)
-            result[:lookback-1] = np.nan
-            return result
-        except Exception as e:
-            logger.error(f"Error calculating volatility: {str(e)}")
-            raise
-
-    def EMA(self, price: Union[pd.Series, np.ndarray], window: int) -> pd.Series:
-        ''' (Wilder's) Exponential Moving Average. '''
-        try:
-            price = pd.Series(price)
-            return price.ewm(alpha=1/window).mean()
-        except Exception as e:
-            logger.error(f"Error calculating EMA: {str(e)}")
-            raise
-
-    def ema(self, window: int) -> np.ndarray:
-        ''' (Wilder's) Exponential Moving Average. '''
-        try:
-            return np.array(self.price.ewm(span=window).mean())
-        except Exception as e:
-            logger.error(f"Error calculating EMA: {str(e)}")
-            raise
-    
-    def sma(self, window: int) -> np.ndarray:
-        ''' Simple Moving Average. '''
-        try:
-            return np.array(self.price.rolling(window=window).mean())
-        except Exception as e:
-            logger.error(f"Error calculating SMA: {str(e)}")
-            raise
-    
-    def macd(self, fast_window: int = 10, slow_window: int = 20) -> Tuple[np.ndarray, pd.Series]:
-        ''' Moving Average Convergence Divergence. '''
-        try:
-            mcd = self.ema(fast_window) - self.sma(slow_window)
-            mcd_signal = pd.Series(mcd, index=self.dte_index).ewm(span=9).mean()
-            return mcd, mcd_signal
-        except Exception as e:
-            logger.error(f"Error calculating MACD: {str(e)}")
-            raise
-    
-    def ATR(self, window: int) -> np.ndarray:
-        ''' Average True Range.: Need three columns, High, Low, and Close. '''
-        try:
-            if self.high is None or self.low is None:
-                hi = self.price.rolling(window=window).min().values
-                lo = self.price.rolling(window=window).max().values
-            else: 
-                hi = self.high.rolling(window=window).min().values
-                lo = self.low.rolling(window=window).max().values
-            c = self.price.values
-            tr = np.vstack([np.abs(hi[1:]-c[:-1]),np.abs(lo[1:]-c[:-1]),(hi-lo)[1:]]).max(axis=0)
-            tr = np.concatenate([[np.nan], tr])
-            return self.EMA(tr, window).values
-        except Exception as e:
-            logger.error(f"Error calculating ATR: {str(e)}")
-            raise
-
-    def ADX(self, window: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        ''' Average Directional Index. '''
-        try:
-            if self.high is None or self.low is None: 
-                hi = self.price.rolling(window=window).min().values 
-                lo = self.price.rolling(window=window).max().values 
-            else: 
-                hi = self.high.rolling(window=window).min().values 
-                lo = self.low.rolling(window=window).max().values
-            c = self.price.values 
-            up = hi[1:] - hi[:-1]
-            down = lo[:-1] - lo[1:]
-            up_ind = up > down
-            down_ind = down > up
-            dmup = np.zeros(len(up))
-            dmdown = np.zeros(len(down))
-            dmup = np.where(up_ind, up, 0)
-            dmdown = np.where(down_ind, down, 0)
-            atr = self.ATR(window)[1:]
-            diplus = 100 * self.EMA(dmup, window) / atr
-            diminus = 100 * self.EMA(dmdown, window) / atr
-            diminus[(diplus + diminus) == 0] = 1e-5
-            dx = 100 * np.abs(diplus - diminus) / (diplus + diminus)
-            dx = np.concatenate([[np.nan], dx])
-            return self.EMA(dx, window).values, diplus.values, diminus.values
-        except Exception as e:
-            logger.error(f"Error calculating ADX: {str(e)}")
-            raise
-
-    def BB(self, window: int = 20, m: float = 2) -> np.ndarray:
-        ''' Bollinger Bands. '''
-        try:
-            sma = self.price.rolling(window=window).mean()
-            sigma = self.price.rolling(window=window).std()
-            return np.array((self.price - sma) / (m * sigma))
-        except Exception as e:
-            logger.error(f"Error calculating Bollinger Bands: {str(e)}")
-            raise
 
     def stochastic(self, window: int = 14) -> np.ndarray:
-        ''' Stochastic Oscillator. '''
+        ''' MOMENTUM: Stochastic Oscillator. '''
         try:
             h14 = self.price.rolling(window=window).max()
             l14 = self.price.rolling(window=window).min()
@@ -208,7 +86,7 @@ class Indicators:
             raise
     
     def slow_stoch(self, window: int = 14) -> np.ndarray:
-        ''' Slow Stochastic Oscillator. '''
+        '''  MOMENTUM: Slow Stochastic Oscillator. '''
         try:
             fast = pd.Series(self.stochastic(window))
             return fast.rolling(window=3).mean().values
@@ -217,60 +95,13 @@ class Indicators:
             raise
 
     def momentum(self, window: int = 10) -> np.ndarray:
-        ''' Momentum. '''
+        ''' MOMENTUM:  Momentum. '''
         try:
             return np.array((self.price - self.price.shift(window)) / self.price.shift(window))
         except Exception as e:
             logger.error(f"Error calculating Momentum: {str(e)}")
             raise
 
-    def LOI(self, window: Optional[int] = None, out: int = 5) -> np.ndarray:
-        ''' Return High Probability Price Levels, for a given window. '''
-        try:
-            if window is None: 
-                window = len(self.price)
-            p = self.price.resample('1min').last()
-            x, y = np.unique(p.tail(window), return_counts=True)
-            y = y / len(x)
-            return x[-out:]
-        except Exception as e:
-            logger.error(f"Error calculating LOI: {str(e)}")
-            raise
-
-    def keltner(self, window: int = 20, m: float = 2) -> np.ndarray:
-        ''' Keltner Channels. Indicator '''
-        try:
-            return np.array((self.price - self.ema(window)) / (m * self.ATR(window)))
-        except Exception as e:
-            logger.error(f"Error calculating Keltner Channels: {str(e)}")
-            raise
-    
-    def KAMA(self, n: int = 10, pow1: float = 2, pow2: float = 30) -> np.ndarray:
-        ''' kama indicator '''    
-        try:
-            price = self.price
-            absDiffx = abs(price - price.shift(1))  
-            ER_num = abs(price - price.shift(n))
-            ER_den = absDiffx.rolling(n).sum()
-            ER = ER_num / ER_den
-            sc = (ER * (2.0/(pow1+1)-2.0/(pow2+1.0))+2/(pow2+1.0)) ** 2.0
-            answer = np.zeros(sc.size)
-            N = len(answer)
-            first_value = True
-            for i in range(N):
-                if sc.iloc[i] != sc.iloc[i]:
-                    answer[i] = np.nan
-                else:
-                    if first_value:
-                        answer[i] = price.iloc[i]
-                        first_value = False
-                    else:
-                        answer[i] = answer[i-1] + sc.iloc[i] * (price.iloc[i] - answer[i-1])
-            return answer
-        except Exception as e:
-            logger.error(f"Error calculating KAMA: {str(e)}")
-            raise
-    
     def rsi(self, window: int = 14) -> np.ndarray:
         ''' Relative Strength Index. '''
         try:
