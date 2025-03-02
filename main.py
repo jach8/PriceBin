@@ -10,7 +10,7 @@ from typing import List, Dict, Union, Optional
 from src.db_connect import Prices
 from src.report import perf as performance
 from src.utils import add_stock, delete_stock
- 
+
 
 def init():
     """ Initialize the program. """

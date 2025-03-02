@@ -266,32 +266,12 @@ class moving_avg:
         out.insert(4,'volume', df['volume'])
         return out
 
-    def concatenate_min_daily(self, min_df: pd.DataFrame, daily_df: pd.DataFrame) -> pd.DataFrame:
-        """Combine intraday and daily data.
-
-        Args:
-            min_df: DataFrame with intraday data
-            daily_df: DataFrame with daily data
-
-        Returns:
-            DataFrame with combined data aligned to intraday index
-        """
-        min_df = min_df.copy()
-        daily_df = daily_df.copy()
-        min_df['day'] = min_df.index.date
-        daily_df['day'] = daily_df.index.date
-        cols = ['open', 'high', 'low', 'close', 'volume']
-        daily_cols = [f'daily_{x}' for x in cols]
-        daily_df.rename(columns=dict(zip(cols, daily_cols)), inplace=True)
-        return pd.merge(
-            min_df, daily_df, on='day', how='inner'
-        ).drop(columns=['day']).set_index(min_df.index)
-
 if __name__ == "__main__":
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).resolve().parents[2]))
     from main import Manager, get_path
+    from src.utils import combine_timeframes
 
     # Initialize
     connections = get_path()
@@ -307,7 +287,7 @@ if __name__ == "__main__":
     daily_ribbon = ma.ribbon(daily_df, ma='wma')
     
     # Combine timeframes
-    combined = ma.concatenate_min_daily(intraday_ribbon, daily_ribbon)
+    combined = combine_timeframes(intraday_ribbon, daily_ribbon)
     
     # Display sample of results
     print("\nSample Analysis Results:")

@@ -4,10 +4,9 @@ import sqlite3 as sql
 import logging
 from typing import Union, Tuple, Dict, List, Optional
 from pandas import Series, DataFrame
-from technicals.vol import volatility 
-from technicals.others import descriptive_indicators
-from technicals.ma import moving_avg
-
+from .technicals.vol import volatility 
+from .technicals.others import descriptive_indicators
+from .technicals.ma import moving_avg
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +30,6 @@ class Indicators:
         return self.moving_average._validate_dataframe(df)
     
     
-
 
 
 
