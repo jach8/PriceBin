@@ -13,7 +13,6 @@ from pathlib import Path
 from contextlib import contextmanager
 from functools import wraps
 
-from .indicators import Indicators
 from .get_data import UpdateStocks
 from .conn_pool import DatabaseConnectionPool as get_pool
 
@@ -99,7 +98,6 @@ class Prices(UpdateStocks):
                 logger.error(f"Failed to parse ticker JSON file: {e}")
                 raise
                 
-            self.Indicators = Indicators
             
             logger.info(f"PriceDB Initialized successfully at {dt.datetime.now()}")
             logger.info("Connection pool initialized")

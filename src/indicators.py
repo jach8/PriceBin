@@ -4,9 +4,12 @@ import sqlite3 as sql
 import logging
 from typing import Union, Tuple, Dict, List, Optional
 from pandas import Series, DataFrame
-from .technicals.vol import volatility 
-from .technicals.others import descriptive_indicators
-from .technicals.ma import moving_avg
+from technicals.vol import volatility 
+from technicals.others import descriptive_indicators
+from technicals.ma import moving_avg
+# from .technicals.vol import volatility 
+# from .technicals.others import descriptive_indicators
+# from .technicals.ma import moving_avg
 
 # Configure logging
 logging.basicConfig(
@@ -21,14 +24,21 @@ class Indicators:
         self.moving_average = moving_avg()
         self.volatility = volatility()
         self.descriptive = descriptive_indicators()
-        self.ma_windows = np.array([10, 20, 50, 100, 200])
-        self.vol_windows = np.array([6, 10, 20, 28])
-        self.other_windows = np.array([10, 20])
-
-    def _validate_dataframe(self, df:pd.DataFrame) -> pd.DataFrame:
-        """ Validate the OHLCV DataFrame """
-        return self.moving_average._validate_dataframe(df)
+        self.moving_average.windows = np.array([10, 20, 50, 100, 200])
+        self.volatility.windows = np.array([6, 10, 20, 28])
+        self.descriptive.windows = np.array([10, 20])
     
+    def moving_average_ribbon(self, df: pd.DataFrame, ma:str='sma') -> pd.DataFrame:
+        """ Generate a moving average ribbon """
+        assert ma in ['sma', 'ema', 'wma', 'kama'], 'Invalid moving average type'
+        print(type(df))
+        df = self.moving_average._validate_dataframe(df)
+        return self.moving_average.ribbon(df, ma=ma)
+    
+    def volatility_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """ Generate volatility indicators """
+        df = self.volatility._validate_dataframe(df)
+        return self.volatility.vol_indicators(df)
     
 
 
@@ -44,6 +54,8 @@ if __name__ == "__main__":
 
     connections = get_path()
     m = Manager(connections)
-    df = m.Pricedb.ohlc('spy', daily=False).resample('3T').last()
-
+    df = m.Pricedb.ohlc('spy', daily=False).resample('3T').last().drop(columns = ['Date'])
+    df = m.Pricedb.ohlc('spy', daily=True).resample('3D').last().drop(columns = ['Date'])
     print(df)
+    i = Indicators()
+    print(i.moving_average_ribbon(df, ma='sma'))
