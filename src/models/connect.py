@@ -9,14 +9,23 @@ import pandas as pd
 import datetime as dt 
 from tqdm import tqdm 
 import scipy.stats as stats 
-from logging import getLogger
+from logging import getLogger, DEBUG, INFO, Formatter, StreamHandler
 from typing import Union, Optional, Dict, List
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, KBinsDiscretizer
 
+# Configure module logger
 logger = getLogger(__name__)
+logger.setLevel(DEBUG)
+if not logger.handlers:
+    handler = StreamHandler()
+    handler.setLevel(DEBUG)
+    formatter = Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 class data:
     def __init__(self, 
@@ -146,10 +155,9 @@ class setup(data):
         Returns:
             self: The setup instance
         """
-        if self.verbose:
-            print(f"Features before processing: {self.features.shape}")
-            print(f"Feature names: {self.feature_names}")
-            print(f"Target names: {self.target_names}")
+        # logger.debug(f"Features before processing: {self.features.shape}")
+        # logger.debug(f"Feature names: {self.feature_names}")
+        # logger.debug(f"Target names: {self.target_names}")
         
         # Validate inputs
         if not isinstance(self.features, pd.DataFrame) or self.features.empty:
@@ -160,7 +168,7 @@ class setup(data):
             
         self.scaler = kwargs.get('scaler', MinMaxScaler())
         self.discretizer = kwargs.get('discritize', False)
-        self.y_format = kwargs.get('y_format', 'cont')
+        self.y_format = kwargs.get('y_format', 'binary')
         self.test_size = kwargs.get('test_size', 0.2)
         
         # Scale features first
@@ -176,13 +184,11 @@ class setup(data):
             if filtered_features.empty:
                 logger.warning(f"No features match the pattern: {indicator_type}")
                 logger.warning("Available indicators: EMA, BB, ATR, KC, ADX")
-                # Fall back to using all features instead of raising error
-                filtered_features = self.features_scaled
-            self.features_scaled = filtered_features
+            else:
+                self.features_scaled = filtered_features
             
-        if self.verbose:
-            print(f"Features after processing: {self.features_scaled.shape}")
-            print(f"Selected features: {list(self.features_scaled.columns)}")
+        # logger.debug(f"Features after processing: {self.features_scaled.shape}")
+        # logger.debug(f"Selected features: {list(self.features_scaled.columns)}")
             
         if self.discretizer:
             self.nbins = kwargs.get('nbins', 5)
@@ -212,33 +218,30 @@ class setup(data):
         else:  # 'cont' or any other format
             anoms = target_data.copy()
             
-        if self.verbose:
-            print(f"Target shape: {anoms.shape}")
+        # logger.debug(f"Target shape: {anoms.shape}")
             
         self.ytrain = anoms.loc[self.xtrain.index]
         self.ytest = anoms.loc[self.xtest.index]
         self.xtrain = self.features_scaled.loc[self.xtrain.index]  # Use scaled features
         self.xtest = self.features_scaled.loc[self.xtest.index]    # Use scaled features
         
-        if self.verbose:
-            print(f"Training set shape: {self.xtrain.shape}")
-            print(f"Testing set shape: {self.xtest.shape}")
+        # logger.debug(f"Training set shape: {self.xtrain.shape}")
+        # logger.debug(f"Testing set shape: {self.xtest.shape}")
             
         return self
     
     def merge_preds(self, trainpred, testpred, model_name='anomaly'):
+        """Merge predictions with price data"""
         if not isinstance(trainpred, (pd.Series, pd.DataFrame)):
             trainpred = pd.DataFrame(trainpred, index=self.ytrain.index, columns=[model_name])
             testpred = pd.DataFrame(testpred, index=self.ytest.index, columns=[model_name])
-            
-        if self.verbose:
-            print("Value Counts: ", testpred.value_counts())
             
         trainpred = self.price_data.loc[self.xtrain.index].join(trainpred)
         testpred = self.price_data.loc[self.xtest.index].join(testpred)
         return trainpred, testpred
     
     def pca_pred(self, pred):
+        """Handle dimensionality reduction predictions"""
         if not isinstance(pred, (pd.Series, pd.DataFrame)):
             pred = pd.DataFrame(pred, index=self.features_scaled.index)
             
@@ -251,27 +254,30 @@ if __name__ == "__main__":
     import sys
     sys.path.append(str(Path(__file__).resolve().parents[2]))
     from main import Manager, get_path
-    from src.models.anom.model import anomaly_model
     
     # Get data
     get_path = get_path()
     m = Manager(get_path)
     d = m.Pricedb.model_preperation('spy')
-    print('\n', d.keys(), '\n')
+    logger.info(f"Available data keys: {d.keys()}")
     
     # Test setup functionality
     dc = setup(d['df'], d['features'], d['target'], d['stock'])
-    print(dc.time_split(d['X'], d['y']))
-    print(dc.temporal_split(d['X'], d['y'], t=100))
-    print(dc.initialize('EMA'))
+    dc.initialize('EMA')
+    logger.info("Setup test completed successfully")
+    
     
     # Test anomaly model
-    print("\nTesting anomaly model...")
+    logger.info("Testing anomaly model...")
+    sys.path.append(str(Path(__file__).resolve().parent))
+    
+    from anom.model import anomaly_model
     model = anomaly_model(
         df=d['df'],
         feature_names=d['features'],
         target_names=d['target'],
-        stock=d['stock']
+        stock=d['stock'],
+        verbose=True
     )
-    model.verbose = True
+    model.initialize('EMA')  # Initialize with EMA features only
     model.fit()
