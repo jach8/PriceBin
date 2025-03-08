@@ -22,7 +22,8 @@ import pandas as pd
 import numpy as np 
 import sqlite3 as sql 
 from logging import getLogger
-
+from .utils import combine_timeframes, derive_timeframe
+# from utils import combine_timeframes, derive_timeframe
 logger = getLogger(__name__)
 
 class MovingAverageError(Exception):
@@ -70,67 +71,13 @@ class moving_avg:
             DataValidationError: If DataFrame doesn't meet requirements
         """
         if not isinstance(df, pd.DataFrame):
-            raise DataValidationError("Input must be a pandas DataFrame")
+            raise DataValidationError(f"Input must be a pandas DataFrame Got: {type(df)}")
         if not isinstance(df.index, pd.DatetimeIndex):
             raise DataValidationError("DataFrame must have DatetimeIndex")
         if len(df) < 2:
             raise DataValidationError("DataFrame must have at least 2 rows")
         if 'close' not in list(df.columns.str.lower()):
             raise DataValidationError("DataFrame must have 'close' column")
-
-    def get_time_difference(self, df: pd.DataFrame) -> str:
-        """Determine time difference between consecutive rows.
-
-        Args:
-            df: DataFrame with datetime index
-
-        Returns:
-            Single character timeframe indicator:
-                'T': Minutes
-                'H': Hours
-                'D': Days
-                'W': Weeks
-                'M': Months
-
-        Raises:
-            TimeframeError: If time difference cannot be determined
-        """
-        try:
-            diff = df.index[-1] - df.index[-2]
-            if diff.days >= 28:
-                return 'M'
-            elif diff.days >= 7:
-                return 'W'
-            elif diff.days >= 1:
-                return 'D'
-            elif diff.seconds >= 3600:
-                return 'H'
-            else:
-                return 'T'
-        except Exception as e:
-            logger.error(f"Error calculating time difference: {str(e)}")
-            raise TimeframeError(f"Failed to determine timeframe: {str(e)}")
-
-    def derive_timeframe(self, df: pd.DataFrame) -> str:
-        """Get DataFrame frequency indicator.
-
-        Args:
-            df: DataFrame with datetime index
-
-        Returns:
-            Single character timeframe indicator
-
-        Raises:
-            TimeframeError: If frequency cannot be determined
-        """
-        try:
-            freq = pd.infer_freq(df.index)
-            if freq is None:
-                freq = self.get_time_difference(df)
-            return freq
-        except Exception as e:
-            logger.error(f"Error deriving timeframe: {str(e)}")
-            raise TimeframeError(f"Failed to derive timeframe: {str(e)}")
 
     def ema(self, df: pd.DataFrame, window: int) -> pd.Series:
         """Calculate Exponential Moving Average.
@@ -146,7 +93,7 @@ class moving_avg:
         """
         self._validate_dataframe(df)
         out = df.copy()
-        tf = self.derive_timeframe(df)
+        tf = derive_timeframe(df)
         col_name = f'EMA{window}{tf}'
         out[col_name] = df['close'].ewm(span=window, adjust=False).mean()
         return out[col_name]
@@ -163,7 +110,7 @@ class moving_avg:
         """
         self._validate_dataframe(df)
         out = df.copy()
-        tf = self.derive_timeframe(df)
+        tf = derive_timeframe(df)
         col_name = f'SMA{window}{tf}'
         out[col_name] = df['close'].rolling(window=window).mean()
         return out[col_name]
@@ -183,7 +130,7 @@ class moving_avg:
         self._validate_dataframe(df)
         out = df.copy()
         weights = np.arange(1, window + 1)
-        tf = self.derive_timeframe(df)
+        tf = derive_timeframe(df)
         col_name = f'WMA{window}{tf}'
         out[col_name] = df['close'].rolling(window=window).apply(
             lambda x: np.dot(x, weights) / weights.sum(),
@@ -227,7 +174,7 @@ class moving_avg:
                         first_value = False
                     else:
                         answer[i] = answer[i-1] + sc.iloc[i] * (price.iloc[i] - answer[i-1])
-            tf = self.derive_timeframe(df)
+            tf = derive_timeframe(df)
             col_name = f'KAMA{window}{tf}'
             out[col_name] = answer
             return out[col_name]

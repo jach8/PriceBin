@@ -1,0 +1,4 @@
+2025-02-13 16:26:09,507 - bin.price.db_connect - INFO - PriceDB Initialized successfully at 2025-02-13 16:26:09.507491
+2025-02-13 16:26:09,508 - bin.price.db_connect - INFO - Established 3 database connections
+2025-02-13 16:29:58,123 - bin.price.db_connect - INFO - PriceDB Initialized successfully at 2025-02-13 16:29:58.123778
+2025-02-13 16:29:58,124 - bin.price.db_connect - INFO - Established 3 database connections

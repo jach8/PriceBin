@@ -26,11 +26,13 @@ Example:
     trading days.
 """
 
-from typing import Union, Optional, Dict, List
 import pandas as pd 
 import numpy as np 
 import sqlite3 as sql 
 from logging import getLogger
+from typing import Union, Optional, Dict, List
+from .utils import combine_timeframes, derive_timeframe
+# from utils import combine_timeframes, derive_timeframe
 
 logger = getLogger(__name__)
 
@@ -78,7 +80,8 @@ class volatility:
         """
         returns = df['close'].pct_change().dropna()
         vol = returns.rolling(window=window).std() * np.sqrt(window)
-        vol.name = f'HV_{window}'
+        tf = derive_timeframe(df)
+        vol.name = f'HV_{window}{tf}'
         return vol
 
     def est_vol(self, df: pd.DataFrame, lookback: int = 10) -> pd.Series:
@@ -107,7 +110,8 @@ class volatility:
             window_rs = rs.rolling(window=lookback).sum() * (1.0 / (lookback - 1.0))
             result = (open_vol + k * close_vol + (1-k) * window_rs).apply(np.sqrt) * np.sqrt(252)
             result[:lookback-1] = np.nan
-            out = pd.Series(result, index = df.index, name = f'EVT_{lookback}')
+            tf = derive_timeframe(df)
+            out = pd.Series(result, index = df.index, name = f'EVT_{lookback}{tf}')
             return out
         except Exception as e:
             logger.error(f"Error calculating volatility: {str(e)}")
@@ -119,7 +123,8 @@ class volatility:
             sma = df.close.rolling(window=window).mean()
             sigma = df.close.rolling(window=window).std()
             out = (df.close - sma) / (m * sigma)
-            out.name = f'BB_{window}'
+            tf = derive_timeframe(df)
+            out.name = f'BB_{window}{tf}'
             return out
         except Exception as e:
             logger.error(f"Error calculating Bollinger Bands: {str(e)}")
@@ -133,7 +138,8 @@ class volatility:
             ema = df.close.ewm(span=window).mean().values
             atr = self.ATR(df, window).values
             kc = (close - ema ) / (m * atr)
-            out = pd.Series(kc, index = df.index, name = f'KC_{window}')
+            tf = derive_timeframe(df)
+            out = pd.Series(kc, index = df.index, name = f'KC_{window}{tf}')
             return out
         except Exception as e:
             logger.error(f"Error calculating Keltner Channels: {str(e)}")
@@ -148,7 +154,8 @@ class volatility:
             c = df.close.values
             tr = np.vstack([np.abs(hi[1:]-c[:-1]),np.abs(lo[1:]-c[:-1]),(hi-lo)[1:]]).max(axis=0)
             tr = np.concatenate([[np.nan], tr])
-            return pd.Series(tr, index = df.index, name = f'ATR_{window}').ewm(alpha = 1/window, min_periods = window).mean()
+            tf = derive_timeframe(df)
+            return pd.Series(tr, index = df.index, name = f'ATR_{window}{tf}').ewm(alpha = 1/window, min_periods = window).mean()
         except Exception as e:
             logger.error(f"Error calculating ATR: {str(e)}")
             raise
@@ -175,7 +182,8 @@ class volatility:
             diminus[(diplus + diminus) == 0] = 1e-5
             dx = 100 * np.abs(diplus - diminus) / (diplus + diminus)
             out = dx.ewm(alpha = 1/window).mean()
-            out.name = f'ADX_{window}'
+            tf = derive_timeframe(df)
+            out.name = f'ADX_{window}{tf}'
             out.index = df.index[1:]
             return out
         except Exception as e:
@@ -187,12 +195,12 @@ class volatility:
         if windows is None:
             windows = self.windows
         try:
+            tf = derive_timeframe(df)
             out = pd.DataFrame()
-            out['close'] = df.close
-            for window in windows: out[f'ATR_{window}'] = self.ATR(df, window)
-            for window in windows: out[f'BB_{window}'] = self.BB(df, window)
-            for window in windows: out[f'KC_{window}'] = self.KC(df, window)
-            for window in windows: out[f'ADX_{window}'] = self.ADX(df, window)
+            for window in windows: out[f'ATR_{window}{tf}'] = self.ATR(df, window)
+            for window in windows: out[f'BB_{window}{tf}'] = self.BB(df, window)
+            for window in windows: out[f'KC_{window}{tf}'] = self.KC(df, window)
+            for window in windows: out[f'ADX_{window}{tf}'] = self.ADX(df, window)
             return out
         except Exception as e:
             logger.error(f"Error calculating volatility indicators: {str(e)}")

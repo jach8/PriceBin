@@ -13,6 +13,8 @@ import pandas as pd
 import numpy as np 
 import sqlite3 as sql 
 from logging import getLogger
+from .utils import combine_timeframes, derive_timeframe
+# from utils import combine_timeframes, derive_timeframe
 
 logger = getLogger(__name__)
 
@@ -112,13 +114,13 @@ class descriptive_indicators:
             windows = self.windows
         try:
             df = self._validate_dataframe(df)
+            tf = derive_timeframe(df)
             out = pd.DataFrame()
-            out['close'] = df.close
             out['ATH'] = self.all_time_highs(df)
             out['ATL'] = self.all_time_lows(df)
-            for window in windows: out[f'RH_{window}'] = self.recent_highs(df, window)
-            for window in windows: out[f'RL_{window}'] = self.recent_lows(df, window)
-            for window in windows: out[f'MR_{window}'] = self.mean_reversion(df, window)
+            for window in windows: out[f'highs_{window}{tf}'] = self.recent_highs(df, window)
+            for window in windows: out[f'lows_{window}{tf}'] = self.recent_lows(df, window)
+            for window in windows: out[f'reversion_{window}{tf}'] = self.mean_reversion(df, window)
             return out
         except Exception as e:
             logger.error(f"Error calculating volatility indicators: {str(e)}")

@@ -1,4 +1,3 @@
-import json
 import sqlite3
 import logging
 from typing import Dict, Optional
@@ -13,7 +12,7 @@ class DatabaseConnectionPool:
     """A thread-safe connection pool for SQLite databases.
 
     This class manages a pool of SQLite database connections based on configuration
-    from a JSON file. It provides connection pooling and proper error handling.
+    from a dictionary. It provides connection pooling and proper error handling.
 
     Attributes:
         _pools: Dictionary mapping connection names to their respective connections.
@@ -21,38 +20,30 @@ class DatabaseConnectionPool:
         _config: Dictionary containing database connection configurations.
     """
 
-    def __init__(self, config_path: str = 'connections.json'):
+    def __init__(self, config: Dict[str, str]) -> None:
         """Initialize the connection pool.
 
         Args:
-            config_path: Path to the JSON configuration file containing database paths.
+            config: Dictionary containing database paths.
 
         Raises:
-            FileNotFoundError: If the configuration file doesn't exist.
-            json.JSONDecodeError: If the configuration file contains invalid JSON.
+            ValueError: If the configuration is invalid.
         """
         self._pools: Dict[str, Optional[sqlite3.Connection]] = {}
         self._locks: Dict[str, Lock] = {}
-        self._config: Dict[str, str] = {}
+        self._config: Dict[str, str] = config
         
         logger.info("Initializing database connection pool")
-        try:
-            with open(config_path, 'r') as f:
-                self._config = json.load(f)
-            
-            # Initialize connection pools for each database
-            for db_name, db_path in self._config.items():
-                if '.db' in db_path:
-                    logger.debug(f"Setting up pool for database: {db_name}")
-                    self._pools[db_name] = None
-                    self._locks[db_name] = Lock()
-        
-        except FileNotFoundError:
-            logger.error(f"Configuration file not found: {config_path}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in configuration file: {e}")
-            raise
+        if not isinstance(config, dict):
+            logger.error("Invalid configuration: expected a dictionary")
+            raise ValueError("Configuration must be a dictionary")
+
+        # Initialize connection pools for each database
+        for db_name, db_path in self._config.items():
+            if '.db' in db_path:
+                logger.debug(f"Setting up pool for database: {db_name}")
+                self._pools[db_name] = None
+                self._locks[db_name] = Lock()
 
     def _create_connection(self, db_name: str) -> sqlite3.Connection:
         """Create a new database connection.
@@ -141,11 +132,15 @@ class DatabaseConnectionPool:
                 except sqlite3.Error as e:
                     logger.error(f"Error closing connection to {db_name}: {e}")
 
-# Create a global instance of the connection pool
-pool = DatabaseConnectionPool()
-
 # Example usage:
 """
+config = {
+    'stock_names': '/path/to/stock_names.db',
+    'another_db': '/path/to/another.db'
+}
+
+pool = DatabaseConnectionPool(config)
+
 try:
     # Get a connection from the pool
     with pool.get_connection('stock_names') as conn:

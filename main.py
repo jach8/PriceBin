@@ -20,6 +20,8 @@ def init():
 def get_path(pre=''):
     with open(pre + 'connections.json', 'r') as f:
         connections = json.load(f)
+    for key, value in connections.items():
+        connections[key] = pre + value
     return connections
 
 def check_path(connections):
@@ -50,25 +52,35 @@ class Manager:
 		self.performance = performance(connections) 
 		# Save the Connection Dict.
 		self.connection_paths = connections
-		  
+
 	def close_connection(self):
 		self.Pricedb.close_connections()
-  
+
+
 	def addStock(self, stock):
 		with sqlite3.connect(self.connection_paths['stock_names']) as conn:
 		    add_stock(conn, self.connection_paths['ticker_path'], stock)
-  
+
 	def removeStock(self, stock):  
 		with sqlite3.connect(self.connection_paths['stock_names']) as conn: 
 			delete_stock(conn, self.connection_paths['ticker_path'], stock)
-   
+
 	def update_stock_prices(self):
 		self.Pricedb.update_stocks()  
 
 
 	
 if __name__ == "__main__":
+    from src.models.connect import data 
     m = Manager()
-    m.close_connection()
- 
- 
+    
+    d = m.Pricedb.model_preperation('spy')
+    print('\n',d.keys(), '\n')
+    dc =  data(d['df'], d['features'], d['target'], d['stock'])
+
+
+
+    from src.models.anom.setup import setup
+    s = setup(d['df'], d['features'], d['target'], d['stock'])
+    s.initialize('spy')
+    print(s.features_scaled.head())

@@ -20,6 +20,8 @@ import pandas as pd
 import numpy as np 
 import sqlite3 as sql 
 from logging import getLogger
+from .utils import combine_timeframes, derive_timeframe
+#from utils import combine_timeframes, derive_timeframe
 
 logger = getLogger(__name__)
 

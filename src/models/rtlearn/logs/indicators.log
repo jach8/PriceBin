@@ -1,0 +1,6 @@
+2025-02-13 16:29:58,122 - bin.options.optgd.db_connect - INFO - Options DB Initialized
+2025-02-13 16:29:58,122 - bin.options.optgd.db_connect - WARNING - You currently have 8 connections open.
+2025-02-13 16:29:58,123 - bin.options.optgd.option_chain - INFO - Option Chain Module Initialized
+2025-02-13 16:29:58,123 - bin.price.db_connect - INFO - PriceDB Initialized successfully at 2025-02-13 16:29:58.123778
+2025-02-13 16:29:58,124 - bin.price.db_connect - INFO - Established 3 database connections
+2025-02-13 16:29:58,171 - bin.alerts.options_alerts - INFO - Notifications instance initialized.

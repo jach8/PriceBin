@@ -15,6 +15,7 @@ from functools import wraps
 
 from .get_data import UpdateStocks
 from .conn_pool import DatabaseConnectionPool as get_pool
+from .indicators import Indicators
 
 # Custom exceptions
 class DatabaseConnectionError(Exception):
@@ -65,7 +66,7 @@ class Prices(UpdateStocks):
         """
         super().__init__(connections)
         self.execution_start_time = time.time()
-        self.pool = get_pool()
+        self.pool = get_pool(connections)
         
         try:
             # Validate connection parameters
@@ -125,7 +126,7 @@ class Prices(UpdateStocks):
             raise InvalidParameterError(f"Invalid database type: {db_type}")
             
         try:
-            with self.pool.get_connection(self.db_mapping[db_type]) as conn:
+            with self.pool.get_connection(db_type) as conn:
                 yield conn
         except (sql.Error, KeyError) as e:
             error_msg = f"Failed to get {db_type} database connection: {str(e)}"
@@ -281,44 +282,51 @@ class Prices(UpdateStocks):
             logger.error(f"Failed to get OHLC data for {stock}: {str(e)}")
             raise
 
-    def get_aggregates(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    def get_aggregates(self, df: pd.DataFrame, agg_type: str = 'all') -> Dict[str, pd.DataFrame]:
         """
-        Get daily, weekly, monthly aggregates
+        Get DataFrame aggregations at different time intervals
         
         Args:
             df: DataFrame with datetime index
+            agg_type: Type of aggregation to return ('intraday', 'daily', or 'all')
             
         Returns:
             Dictionary of aggregated DataFrames
+        
+        Raises:
+            InvalidParameterError: If DataFrame index is not DatetimeIndex or invalid agg_type
         """
         if not isinstance(df.index, pd.DatetimeIndex):
             raise InvalidParameterError("DataFrame index must be DatetimeIndex")
             
-        try:
-            daily = df.resample('B').last().dropna()
-            weekly = df.resample('W').last().dropna()
-            monthly = df.resample('M').last().dropna()
-            return {'B': daily, 'W': weekly, 'M': monthly}
-        except Exception as e:
-            logger.error(f"Failed to compute aggregates: {str(e)}")
-            raise
-
-    def intra_day_aggs(self, df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        """Get intraday aggregations"""
-        df.index = pd.to_datetime(df.index)
-        if not isinstance(df.index, pd.DatetimeIndex):
-            raise InvalidParameterError("DataFrame index must be DatetimeIndex")
+        if agg_type not in ['intraday', 'daily', 'all']:
+            raise InvalidParameterError("agg_type must be 'intraday', 'daily', or 'all'")
             
         try:
-            return {
-                '3min': df.resample('3T').last().dropna(),
-                '6min': df.resample('6T').last().dropna(),
-                '18min': df.resample('18T').last().dropna(),
-                '1H': df.resample('H').last().dropna(),
-                '4H': df.resample('4H').last().dropna()
-            }
+            aggregations = {}
+            
+            if agg_type in ['intraday', 'all']:
+                intraday_aggs = {
+                    '3min': df.resample('3T').last().dropna(),
+                    '6min': df.resample('6T').last().dropna(),
+                    '18min': df.resample('18T').last().dropna(),
+                    '1H': df.resample('H').last().dropna(),
+                    '4H': df.resample('4H').last().dropna()
+                }
+                aggregations.update(intraday_aggs)
+                
+            if agg_type in ['daily', 'all']:
+                daily_aggs = {
+                    'B': df.resample('B').last().dropna(),
+                    'W': df.resample('W').last().dropna(),
+                    'M': df.resample('M').last().dropna()
+                }
+                aggregations.update(daily_aggs)
+                
+            return aggregations
+            
         except Exception as e:
-            logger.error(f"Failed to compute intraday aggregates: {str(e)}")
+            logger.error(f"Failed to compute aggregates: {str(e)}")
             raise
 
     def daily_aggregates(self, stock: str) -> Dict[str, pd.DataFrame]:
@@ -343,3 +351,32 @@ class Prices(UpdateStocks):
             logger.error(f"Error closing pool connections: {str(e)}")
             raise
 
+    def model_preperation(self, stock, daily = True, ma = 'ema') -> Dict:
+        """
+        Prepare data for model training
+        
+        Args:
+            stock: Stock symbol
+            daily: Whether to use daily or intraday data
+            
+        Returns:
+            Tuple of X, y, feature names, and target names
+        """
+        try:
+            i = Indicators()
+            df = self.ohlc(stock, daily=daily)
+            mdf = i.all_indicators(df, ma).dropna().drop(columns = ['open', 'high', 'low'])
+            mdf['target'] = mdf['close'].shift(-1)
+            mdf = mdf.dropna()
+            return {
+                'stock': stock,
+                'df': mdf,
+                'X': mdf.drop(columns = ['close', 'target']),
+                'y': mdf['target'],
+                'features': list(mdf.drop(columns = ['close', 'target']).columns),
+                'target': ['target']
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to prepare data for model: {str(e)}")
+            raise

@@ -4,12 +4,14 @@ import sqlite3 as sql
 import logging
 from typing import Union, Tuple, Dict, List, Optional
 from pandas import Series, DataFrame
-from technicals.vol import volatility 
-from technicals.others import descriptive_indicators
-from technicals.ma import moving_avg
-# from .technicals.vol import volatility 
-# from .technicals.others import descriptive_indicators
-# from .technicals.ma import moving_avg
+
+
+# from technicals.vol import volatility 
+# from technicals.others import descriptive_indicators
+# from technicals.ma import moving_avg
+from .technicals.vol import volatility 
+from .technicals.others import descriptive_indicators
+from .technicals.ma import moving_avg
 
 # Configure logging
 logging.basicConfig(
@@ -21,30 +23,36 @@ logger = logging.getLogger(__name__)
 
 class Indicators:
     def __init__(self, *args, **kwargs) -> None:
-        self.moving_average = moving_avg()
-        self.volatility = volatility()
-        self.descriptive = descriptive_indicators()
-        self.moving_average.windows = np.array([10, 20, 50, 100, 200])
-        self.volatility.windows = np.array([6, 10, 20, 28])
-        self.descriptive.windows = np.array([10, 20])
+        self.__moving_average = moving_avg()
+        self.__volatility = volatility()
+        self.__descriptive = descriptive_indicators()
+        self.__moving_average.windows = np.array([6, 10, 20, 28, 96, 108])
+        self.__volatility.windows = np.array([6, 10, 20, 28])
+        self.__descriptive.windows = np.array([10, 20])
     
     def moving_average_ribbon(self, df: pd.DataFrame, ma:str='sma') -> pd.DataFrame:
         """ Generate a moving average ribbon """
         assert ma in ['sma', 'ema', 'wma', 'kama'], 'Invalid moving average type'
-        print(type(df))
-        df = self.moving_average._validate_dataframe(df)
-        return self.moving_average.ribbon(df, ma=ma)
+        return self.__moving_average.ribbon(df, ma=ma)
     
     def volatility_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """ Generate volatility indicators """
-        df = self.volatility._validate_dataframe(df)
-        return self.volatility.vol_indicators(df)
+        df = self.__volatility._validate_dataframe(df)
+        return self.__volatility.vol_indicators(df)
+
+    def descriptive_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """ Generate descriptive indicators """
+        df = self.__descriptive._validate_dataframe(df)
+        return self.__descriptive.descriptive_indicators(df)
     
-
-
-
-
-
+    def all_indicators(self, df: pd.DataFrame, ma: str = 'sma') -> pd.DataFrame:
+        """ Generate all indicators """
+        out = pd.concat([
+            self.moving_average_ribbon(df, ma),
+            self.volatility_indicators(df),
+            self.descriptive_indicators(df)
+        ], axis=1)
+        return out
 
 if __name__ == "__main__":
     import sys
@@ -55,7 +63,8 @@ if __name__ == "__main__":
     connections = get_path()
     m = Manager(connections)
     df = m.Pricedb.ohlc('spy', daily=False).resample('3T').last().drop(columns = ['Date'])
-    df = m.Pricedb.ohlc('spy', daily=True).resample('3D').last().drop(columns = ['Date'])
-    print(df)
+    df = m.Pricedb.ohlc('spy', daily=True)
     i = Indicators()
-    print(i.moving_average_ribbon(df, ma='sma'))
+    print(i.all_indicators(df, 'kama').dropna())
+    print(i.all_indicators(df).dropna().tail(1).T.round(2))
+

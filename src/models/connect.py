@@ -1,0 +1,277 @@
+"""
+Data Preparation for Models: 
+This module is used for preprocessing the data for the models. 
+"""
+
+import sys
+import numpy as np 
+import pandas as pd 
+import datetime as dt 
+from tqdm import tqdm 
+import scipy.stats as stats 
+from logging import getLogger
+from typing import Union, Optional, Dict, List
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, KBinsDiscretizer
+
+logger = getLogger(__name__)
+
+class data:
+    def __init__(self, 
+                 df: pd.DataFrame, 
+                 feature_names: List = None, 
+                 target_names: List = None,
+                 stock: str = None) -> None:
+        """
+        Initialize the data class
+        Args:
+            df: pd.DataFrame: The DataFrame to use for the data
+            feature_names: List: The names of the features
+            target_names: List: The names of the targets
+            stock: str: The stock symbol
+        """
+        self.stock = stock
+        self.df = df
+        self.feature_names = feature_names if feature_names is not None else []
+        self.target_names = target_names if target_names is not None else []
+        self.features = self.df[self.feature_names] if self.feature_names else pd.DataFrame()
+        self.target = self.df[self.target_names] if self.target_names else pd.DataFrame()
+        
+    def binary_convert(self, x, thresh=0.003, buy=1, sell=0):
+        """
+        Convert the target to binary. 
+        Args:
+            x: The target to convert. 
+        Returns:
+            The converted target. 
+        """
+        return np.where(x > thresh, buy, sell)
+    
+    def multi_convert(self, x, thresh=0.003, buy=1, sell=2, hold=0):
+        """
+        Convert the target to multi-class. 
+        Args:
+            x: The target to convert. 
+        Returns:
+            The converted target. 
+        """
+        return np.where(x > thresh, buy, np.where(x < -thresh, sell, hold))
+    
+    def numeric_df(self, df):
+        """
+        Convert the DataFrame to numeric. 
+        Args:
+            df: The DataFrame to convert. 
+        Returns:
+            The DataFrame converted to numeric. 
+        """
+        return df.apply(pd.to_numeric, errors='coerce')
+    
+    def drop_columns_that_contain(self, df, string):
+        """
+        Drop columns that contain a string. 
+        Args:
+            df: The DataFrame to drop the columns from. 
+            string: The string to search for in the columns. 
+        Returns:
+            The DataFrame with the columns dropped. 
+        """
+        return df[df.columns.drop(list(df.filter(regex=string)))]
+    
+    def temporal_split(
+            self, 
+            x: pd.DataFrame,
+            y: pd.DataFrame,
+            t: int = 100,
+            start_date: str = None,
+            end_date: str = None
+    ) -> Union[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Temporally Split the data into training and testing sets using the last t days for testing. 
+        Args:
+            x: pd.DataFrame: The features
+            y: pd.DataFrame: The target
+            t: int: The number of days to predict
+            start_date: str: The start date
+            end_date: str: The end date
+        Returns:
+            Numpy Array: xtrain, ytrain, xtest, ytest
+        """
+        self.training_dates = x.iloc[:-t].index
+        self.testing_dates = x.iloc[-t:].index
+        self.xtrain = x.iloc[:-t, :].to_numpy()
+        self.xtest = x.iloc[-t:, :].to_numpy()
+        self.ytrain = y.iloc[:-t].to_numpy()
+        self.ytest = y.iloc[-t:].to_numpy()
+        return self.xtrain, self.ytrain, self.xtest, self.ytest
+    
+    def time_split(
+            self, 
+            x: pd.DataFrame, 
+            y: pd.DataFrame, 
+            n_splits: int = 5
+    ) -> TimeSeriesSplit:
+        """
+        Split the data using TimeSeriesSplit
+        Args:
+            x: pd.DataFrame: The features
+            y: pd.DataFrame: The target
+            n_splits: int: The number of splits
+        Returns:
+            The TimeSeriesSplit object
+        """
+        return TimeSeriesSplit(n_splits=n_splits).split(x, y)
+
+class setup(data):
+    def __init__(self, df, feature_names, target_names, stock):
+        super().__init__(df, feature_names, target_names, stock)
+        self.price_data = df  # Initialize price_data
+        self.verbose = True  # Enable verbose for debugging
+        
+    def initialize(self, indicator_type=None, **kwargs):
+        """
+        Initialize the setup with data preprocessing steps
+        Args:
+            indicator_type: Optional regex pattern to filter technical indicators (e.g., 'EMA', 'BB', 'ADX')
+            **kwargs: Additional keyword arguments
+                scaler: sklearn scaler object (default: MinMaxScaler)
+                discretize: bool (default: False)
+                y_format: str (default: 'cont')
+                test_size: float (default: 0.2)
+                nbins: int (default: 5)
+                strategy: str (default: 'kmeans')
+                encode: str (default: 'ordinal')
+        Returns:
+            self: The setup instance
+        """
+        if self.verbose:
+            print(f"Features before processing: {self.features.shape}")
+            print(f"Feature names: {self.feature_names}")
+            print(f"Target names: {self.target_names}")
+        
+        # Validate inputs
+        if not isinstance(self.features, pd.DataFrame) or self.features.empty:
+            raise ValueError("Features DataFrame is empty or not properly initialized")
+            
+        if not self.target_names:
+            raise ValueError("Target names must be specified")
+            
+        self.scaler = kwargs.get('scaler', MinMaxScaler())
+        self.discretizer = kwargs.get('discritize', False)
+        self.y_format = kwargs.get('y_format', 'cont')
+        self.test_size = kwargs.get('test_size', 0.2)
+        
+        # Scale features first
+        self.features_scaled = pd.DataFrame(
+            self.scaler.fit_transform(self.features), 
+            columns=self.features.columns,
+            index=self.features.index
+        )
+        
+        # Apply indicator type filtering if specified
+        if indicator_type is not None:
+            filtered_features = self.features_scaled.filter(regex=indicator_type)
+            if filtered_features.empty:
+                logger.warning(f"No features match the pattern: {indicator_type}")
+                logger.warning("Available indicators: EMA, BB, ATR, KC, ADX")
+                # Fall back to using all features instead of raising error
+                filtered_features = self.features_scaled
+            self.features_scaled = filtered_features
+            
+        if self.verbose:
+            print(f"Features after processing: {self.features_scaled.shape}")
+            print(f"Selected features: {list(self.features_scaled.columns)}")
+            
+        if self.discretizer:
+            self.nbins = kwargs.get('nbins', 5)
+            self.strategy = kwargs.get('strategy', 'kmeans')
+            self.encode = kwargs.get('encode', 'ordinal')
+            self.discretizer = KBinsDiscretizer(
+                n_bins=self.nbins, 
+                encode=self.encode,
+                strategy=self.strategy
+            )
+            
+        self.xtrain, self.xtest = train_test_split(
+            self.features_scaled, 
+            test_size=self.test_size,
+            shuffle=False
+        )
+        
+        # Handle different y_format cases
+        target_data = self.df[self.target_names]
+        
+        if self.y_format == 'binary':
+            anoms = pd.DataFrame(
+                self.binary_convert(target_data, thresh=0.03, buy=1, sell=-1),
+                columns=self.target_names,
+                index=self.df.index
+            )
+        else:  # 'cont' or any other format
+            anoms = target_data.copy()
+            
+        if self.verbose:
+            print(f"Target shape: {anoms.shape}")
+            
+        self.ytrain = anoms.loc[self.xtrain.index]
+        self.ytest = anoms.loc[self.xtest.index]
+        self.xtrain = self.features_scaled.loc[self.xtrain.index]  # Use scaled features
+        self.xtest = self.features_scaled.loc[self.xtest.index]    # Use scaled features
+        
+        if self.verbose:
+            print(f"Training set shape: {self.xtrain.shape}")
+            print(f"Testing set shape: {self.xtest.shape}")
+            
+        return self
+    
+    def merge_preds(self, trainpred, testpred, model_name='anomaly'):
+        if not isinstance(trainpred, (pd.Series, pd.DataFrame)):
+            trainpred = pd.DataFrame(trainpred, index=self.ytrain.index, columns=[model_name])
+            testpred = pd.DataFrame(testpred, index=self.ytest.index, columns=[model_name])
+            
+        if self.verbose:
+            print("Value Counts: ", testpred.value_counts())
+            
+        trainpred = self.price_data.loc[self.xtrain.index].join(trainpred)
+        testpred = self.price_data.loc[self.xtest.index].join(testpred)
+        return trainpred, testpred
+    
+    def pca_pred(self, pred):
+        if not isinstance(pred, (pd.Series, pd.DataFrame)):
+            pred = pd.DataFrame(pred, index=self.features_scaled.index)
+            
+        trainpred = self.price_data.loc[self.xtrain.index].join(pred.loc[self.xtrain.index])
+        testpred = self.price_data.loc[self.xtest.index].join(pred.loc[self.xtest.index])
+        return trainpred, testpred
+
+if __name__ == "__main__":
+    from pathlib import Path 
+    import sys
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from main import Manager, get_path
+    from src.models.anom.model import anomaly_model
+    
+    # Get data
+    get_path = get_path()
+    m = Manager(get_path)
+    d = m.Pricedb.model_preperation('spy')
+    print('\n', d.keys(), '\n')
+    
+    # Test setup functionality
+    dc = setup(d['df'], d['features'], d['target'], d['stock'])
+    print(dc.time_split(d['X'], d['y']))
+    print(dc.temporal_split(d['X'], d['y'], t=100))
+    print(dc.initialize('EMA'))
+    
+    # Test anomaly model
+    print("\nTesting anomaly model...")
+    model = anomaly_model(
+        df=d['df'],
+        feature_names=d['features'],
+        target_names=d['target'],
+        stock=d['stock']
+    )
+    model.verbose = True
+    model.fit()
