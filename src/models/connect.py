@@ -248,36 +248,41 @@ class setup(data):
         trainpred = self.price_data.loc[self.xtrain.index].join(pred.loc[self.xtrain.index])
         testpred = self.price_data.loc[self.xtest.index].join(pred.loc[self.xtest.index])
         return trainpred, testpred
-
 if __name__ == "__main__":
+    ############################################################################################################
     from pathlib import Path 
     import sys
     sys.path.append(str(Path(__file__).resolve().parents[2]))
     from main import Manager, get_path
     
+    ############################################################################################################
     # Get data
     get_path = get_path()
     m = Manager(get_path)
-    d = m.Pricedb.model_preperation('spy')
-    logger.info(f"Available data keys: {d.keys()}")
+    d = m.Pricedb.model_preperation('spy', start_date = dt.datetime(2020, 1, 1))
+    print(d['features'])
+
     
     # Test setup functionality
-    dc = setup(d['df'], d['features'], d['target'], d['stock'])
-    dc.initialize('EMA')
-    logger.info("Setup test completed successfully")
-    
+    # dc = setup(d['df'], d['features'], d['target'], d['stock'])
+    # dc.initialize('EMA')
+    # logger.info("Setup test completed successfully")
+
     
     # Test anomaly model
-    logger.info("Testing anomaly model...")
     sys.path.append(str(Path(__file__).resolve().parent))
     
     from anom.model import anomaly_model
-    model = anomaly_model(
+    from anom.view import viewer
+    model = viewer(
         df=d['df'],
         feature_names=d['features'],
         target_names=d['target'],
         stock=d['stock'],
         verbose=True
     )
-    model.initialize('EMA')  # Initialize with EMA features only
+    model.initialize('STOCH|RSI|ATH|ATL')  # Initialize with EMA features only
     model.fit()
+
+    # Plot The result: 
+    model.general_plot()

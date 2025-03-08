@@ -12,6 +12,7 @@ from pandas import Series, DataFrame
 from .technicals.vol import volatility 
 from .technicals.others import descriptive_indicators
 from .technicals.ma import moving_avg
+from .technicals.momentum import momentum
 
 # Configure logging
 logging.basicConfig(
@@ -25,6 +26,7 @@ class Indicators:
     def __init__(self, *args, **kwargs) -> None:
         self.__moving_average = moving_avg()
         self.__volatility = volatility()
+        self.__momentum = momentum()
         self.__descriptive = descriptive_indicators()
         self.__moving_average.windows = np.array([6, 10, 20, 28, 96, 108])
         self.__volatility.windows = np.array([6, 10, 20, 28])
@@ -45,10 +47,16 @@ class Indicators:
         df = self.__descriptive._validate_dataframe(df)
         return self.__descriptive.descriptive_indicators(df)
     
+    def momentum_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """ Generate momentum indicators """
+        df = self.__momentum._validate_dataframe(df)
+        return self.__momentum.mom_indicators(df)
+    
     def all_indicators(self, df: pd.DataFrame, ma: str = 'sma') -> pd.DataFrame:
         """ Generate all indicators """
         out = pd.concat([
             self.moving_average_ribbon(df, ma),
+            self.momentum_indicators(df),
             self.volatility_indicators(df),
             self.descriptive_indicators(df)
         ], axis=1)

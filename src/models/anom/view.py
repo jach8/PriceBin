@@ -7,8 +7,8 @@ import sys
 from .model import anomaly_model as models
 
 class viewer(models):
-    def __init__(self, connections):
-        super().__init__(connections)
+    def __init__(self, df, feature_names, target_names, stock, verbose = False):
+        super().__init__(df, feature_names, target_names, stock, verbose)
         
         
     def general_plot(self):
@@ -24,10 +24,10 @@ class viewer(models):
         print(ii == 3)
 
         for i, p in enumerate(all_preds[:]):
-            cs = self.test_preds[p]['Close']
+            cs = self.test_preds[p]['close']
             sc = self.test_preds[p]
-            ax[ii].plot(self.test_preds[p]['Close'], label = 'Close')
-            ax[ii].scatter(self.test_preds[p].index, self.test_preds[p]['Close'], c = self.test_preds[p][p])
+            ax[ii].plot(self.test_preds[p]['close'], label = 'close')
+            ax[ii].scatter(self.test_preds[p].index, self.test_preds[p]['close'], c = self.test_preds[p][p])
             ax[ii].set_title(f'{p} Anomalies')
             ax[ii].legend()
             ii += 1
@@ -43,13 +43,3 @@ class viewer(models):
 
         self.last_pred = pd.concat(lodf, axis = 1, keys = all_preds).tail(1)
         
-if __name__ == "__main__":
-    print("12.15: One whom any person is never disturbed and one who is never disturbed from any person and who is freed from the mundane pleasures, anger, fear and anxiety such o one is very dear to Me.\n")
-    
-    s = viewer(connections)
-    s.initialize('spy', colstring = "call|put")
-    s.fit()
-    s.general_plot()
-    
-
-    

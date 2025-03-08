@@ -351,7 +351,7 @@ class Prices(UpdateStocks):
             logger.error(f"Error closing pool connections: {str(e)}")
             raise
 
-    def model_preperation(self, stock, daily = True, ma = 'ema') -> Dict:
+    def model_preperation(self, stock, daily = True, ma = 'ema', start_date = None, end_date = None) -> Dict:
         """
         Prepare data for model training
         
@@ -366,6 +366,10 @@ class Prices(UpdateStocks):
             i = Indicators()
             df = self.ohlc(stock, daily=daily)
             mdf = i.all_indicators(df, ma).dropna().drop(columns = ['open', 'high', 'low'])
+            if start_date is not None:
+                mdf = mdf[mdf.index >= start_date]
+            if end_date is not None:
+                mdf = mdf[mdf.index <= end_date]
             mdf['target'] = mdf['close'].shift(-1)
             mdf = mdf.dropna()
             return {

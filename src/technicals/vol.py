@@ -190,6 +190,7 @@ class volatility:
             logger.error(f"Error calculating ADX: {str(e)}")
             raise
     
+    
     def vol_indicators(self, df: pd.DataFrame, windows: List[int] = None) -> pd.DataFrame:
         ''' Calculate multiple volatility indicators. '''
         if windows is None:

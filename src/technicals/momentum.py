@@ -94,6 +94,7 @@ class momentum:
             out = pd.DataFrame()
             for window in windows: out = pd.concat([out, self.roc(df, window), self.rsi(df, window)], axis=1)
             for window in windows: out = pd.concat([out, self.stochastic(df, window)], axis=1)
+            for window in windows: out = pd.concat([out, self.rsi(df, window)], axis=1)
             for col in out.columns: out[col] = out[col].astype(float)
             return out
         except Exception as e:

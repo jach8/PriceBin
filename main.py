@@ -32,7 +32,7 @@ def check_path(connections):
 			raise ValueError(f'{value} does not exist')
 		checks.append(True)
 	return all(checks)
-           	 
+
 class Manager:
 	def __init__(self, connections=None):
 		#  If type is string, or is None
@@ -59,7 +59,7 @@ class Manager:
 
 	def addStock(self, stock):
 		with sqlite3.connect(self.connection_paths['stock_names']) as conn:
-		    add_stock(conn, self.connection_paths['ticker_path'], stock)
+			add_stock(conn, self.connection_paths['ticker_path'], stock)
 
 	def removeStock(self, stock):  
 		with sqlite3.connect(self.connection_paths['stock_names']) as conn: 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
 
 
-    from src.models.anom.setup import setup
-    s = setup(d['df'], d['features'], d['target'], d['stock'])
-    s.initialize('spy')
-    print(s.features_scaled.head())
+    # from src.models.anom.setup import setup
+    # s = setup(d['df'], d['features'], d['target'], d['stock'])
+    # s.initialize('spy')
+    # print(s.features_scaled.head())
