@@ -364,12 +364,8 @@ class Prices(UpdateStocks):
         """
         try:
             i = Indicators()
-            df = self.ohlc(stock, daily=daily)
+            df = self.ohlc(stock, daily=daily, start = start_date, end = end_date)
             mdf = i.all_indicators(df, ma).dropna().drop(columns = ['open', 'high', 'low'])
-            if start_date is not None:
-                mdf = mdf[mdf.index >= start_date]
-            if end_date is not None:
-                mdf = mdf[mdf.index <= end_date]
             mdf['target'] = mdf['close'].shift(-1)
             mdf = mdf.dropna()
             return {
