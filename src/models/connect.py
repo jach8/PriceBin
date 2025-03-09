@@ -259,7 +259,7 @@ if __name__ == "__main__":
     # Get data
     get_path = get_path()
     m = Manager(get_path)
-    d = m.Pricedb.model_preperation('spy', start_date = dt.datetime(2020, 1, 1))
+    d = m.Pricedb.model_preperation('spy', start_date = dt.datetime(2006, 1, 1))
     print(d['features'])
 
     
