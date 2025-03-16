@@ -74,22 +74,24 @@ class EnhancedViewer(StackedAnomalyModel):
             except:
                 pass
                 
+            close = self.price_data.loc[data.index, 'close'].values
             # Plot time series with predictions
-            scatter = ax.scatter(data.index, data['close'], 
+            scatter = ax.scatter(data.index, close, 
                                c=preds, cmap=self.cmap, 
                                alpha=0.6, s=50)
-            ax.plot(data.index, data['close'], color='black', alpha=0.2)
+            ax.plot(data.index, close, color='black', alpha=0.2)
             
             # Add confidence band if scores available
             if scores is not None:
                 scores = StandardScaler().fit_transform(scores.reshape(-1, 1)).ravel()
-                ax.fill_between(data.index, data['close'], 
-                              data['close'] + scores, 
+                ax.fill_between(data.index, close, 
+                              close + scores, 
                               alpha=0.2, color='gray')
                 
             ax.set_title(f'{name} Predictions')
             ax.set_xlabel('Date')
             ax.set_ylabel('Price')
+            ax.legend(*scatter.legend_elements(), title="Predictions", loc='upper left')
             
         plt.tight_layout()
         plt.show()
@@ -125,10 +127,10 @@ class EnhancedViewer(StackedAnomalyModel):
         Z = Z.reshape(xx.shape)
         
         # Plot decision boundary
+        colors = np.where(self.ytest == 1, 1, -1)  # Map to -1 and 1 for coloring
         plt.figure(figsize=(10, 8))
         plt.contourf(xx, yy, Z, cmap=self.cmap, alpha=0.4)
-        plt.scatter(X_2d[:, 0], X_2d[:, 1], c=self.ytest, 
-                   cmap=self.cmap, alpha=0.8)
+        plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors, alpha=0.8, cmap=self.cmap, edgecolor='k', s=50)
         plt.title("Meta-Learner Decision Boundary")
         plt.xlabel(f"First Principal Component ({pca.explained_variance_ratio_[0]:.2%})")
         plt.ylabel(f"Second Principal Component ({pca.explained_variance_ratio_[1]:.2%})")
@@ -139,7 +141,7 @@ class EnhancedViewer(StackedAnomalyModel):
         """Plot confidence score distributions for each model"""
         scores_dict = {}
         
-        # Collect confidence scores from each model
+        # Collect confidence scores from each model's final layer
         for name, model in self.base_models.items():
             try:
                 if hasattr(model, 'decision_function'):
@@ -149,9 +151,12 @@ class EnhancedViewer(StackedAnomalyModel):
                 else:
                     continue
                     
-                scores = StandardScaler().fit_transform(scores.reshape(-1, 1)).ravel()
+                # Ensure scores are 1D
+                scores = np.asarray(scores).ravel()
                 scores_dict[name] = scores
-            except:
+                
+            except Exception as e:
+                logger.warning(f"Could not get confidence scores for {name}: {str(e)}")
                 continue
                 
         if not scores_dict:
@@ -159,30 +164,37 @@ class EnhancedViewer(StackedAnomalyModel):
             return
             
         # Plot distributions
-        fig, axes = plt.subplots(len(scores_dict), 1, figsize=(12, 4*len(scores_dict)))
-        if len(scores_dict) == 1:
+        n_models = len(scores_dict)
+        fig, axes = plt.subplots(n_models, 1, figsize=(12, 2*n_models))
+        if n_models == 1:
             axes = [axes]
             
         for ax, (name, scores) in zip(axes, scores_dict.items()):
             # Separate scores by class
-            normal_scores = scores[self.ytest == 1]
-            anomaly_scores = scores[self.ytest == -1]
+            normal_scores = [scores[x] for x, i in enumerate(self.ytest.target) if i == 0]
+            anomaly_scores = [scores[x] for x, i in enumerate(self.ytest.target) if i == 1]
+            print(f"Normal scores: {len(normal_scores)}, Anomaly scores: {len(anomaly_scores)}")
             
-            # Calculate KDE for each class
+            # Plot KDE for each class if we have data
             for scores_set, label, color in [
                 (normal_scores, 'Normal', self.colors[0]),
                 (anomaly_scores, 'Anomaly', self.colors[1])
             ]:
                 if len(scores_set) > 0:
-                    kde = gaussian_kde(scores_set)
-                    x_range = np.linspace(scores.min(), scores.max(), 200)
-                    density = kde(x_range)
-                    ax.plot(x_range, density, label=label, color=color)
+                    
+                    try:
+                        kde = gaussian_kde(scores_set)
+                        x_range = np.linspace(min(scores), max(scores), 200)
+                        density = kde(x_range)
+                        ax.plot(x_range, density, label=label, color=color)
+                    except Exception as e:
+                        logger.warning(f"KDE failed for {name} {label}: {str(e)}")
+                        continue
                     
             ax.set_title(f'{name} Confidence Score Distribution')
             ax.set_xlabel('Confidence Score')
             ax.set_ylabel('Density')
-            ax.legend()
+            # ax.legend()
             
         plt.tight_layout()
         plt.show()
@@ -191,30 +203,34 @@ class EnhancedViewer(StackedAnomalyModel):
         """Compare performance metrics across ensemble models"""
         metrics = {}
         
+        true_preds = np.where(self.ytest == 1, -1, 1)  # Map to -1 and 1 for consistency
         # Calculate metrics for each model
         for name, model in self.base_models.items():
             preds = model.predict(self.xtest)
+            
+            # Metrics
             metrics[name] = {
-                'Accuracy': (preds == self.ytest).mean(),
+                'Accuracy': (preds == true_preds).mean(),
                 'Anomaly Rate': (preds == -1).mean(),
-                'F1': f1_score(self.ytest, preds)
+                'F1': f1_score(true_preds, preds, pos_label=-1)
             }
             
         # Add meta-learner metrics
-        meta_preds = self.predict(self.xtest)
+        meta_preds = self.predict(self.xtest).values
         metrics['Meta-Learner'] = {
-            'Accuracy': (meta_preds == self.ytest).mean(),
+            'Accuracy': (meta_preds == true_preds).mean(),
             'Anomaly Rate': (meta_preds == -1).mean(),
-            'F1': f1_score(self.ytest, meta_preds)
+            'F1': f1_score(true_preds, meta_preds, average = 'micro')
         }
         
         # Create comparison plot
         metrics_df = pd.DataFrame(metrics).T
-        
+
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         for i, metric in enumerate(metrics_df.columns):
-            axes[i].bar(range(len(metrics_df)), metrics_df[metric], 
-                       color=self.colors[0], alpha=0.7)
+            # axes[i].bar(range(len(metrics_df)), metrics_df[metric], color=self.colors[0], alpha=0.7)
+            # axes[i].bar(metrics_df.index, metrics_df[metric], color=self.colors[0], alpha=0.7)
+            axes[i].bar(metrics_df.index, metrics_df[metric])
             axes[i].set_xticks(range(len(metrics_df)))
             axes[i].set_xticklabels(metrics_df.index, rotation=45)
             axes[i].set_title(f'{metric} by Model')
@@ -236,7 +252,7 @@ class EnhancedViewer(StackedAnomalyModel):
             all_preds.append(pd.Series(preds, index=self.xtest.index, name=name))
             
         meta_preds = self.predict(self.xtest)
-        all_preds.append(pd.Series(meta_preds, index=self.xtest.index, name='Meta-Learner'))
+        all_preds.append(pd.Series(meta_preds.values.ravel(), index=self.xtest.index, name='Meta-Learner'))
         
         # Calculate rolling agreement
         preds_df = pd.concat(all_preds, axis=1)
@@ -247,11 +263,11 @@ class EnhancedViewer(StackedAnomalyModel):
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
         
         # Plot price with agreement
-        ax1.plot(self.xtest.index, self.xtest['close'], color='black', alpha=0.5)
+        ax1.plot(self.xtest.index, self.price_data['close'].loc[self.xtest.index], color='black', alpha=0.5)
         ax1.set_ylabel('Price')
         ax2.plot(rolling_agreement.index, rolling_agreement, color='blue')
         ax2.set_ylabel('Model Agreement')
-        ax2.set_ylim(0, 1)
+        # ax2.set_ylim(0, 1)
         
         plt.title(f'Model Agreement (Rolling {window}-day window)')
         plt.tight_layout()

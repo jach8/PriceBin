@@ -366,7 +366,7 @@ class Prices(UpdateStocks):
             i = Indicators()
             df = self.ohlc(stock, daily=daily, start = start_date, end = end_date)
             mdf = i.all_indicators(df, ma).dropna().drop(columns = ['open', 'high', 'low'])
-            mdf['target'] = mdf['close'].shift(-1)
+            mdf['target'] = mdf['close'].pct_change().shift(-1)
             mdf = mdf.dropna()
             return {
                 'stock': stock,

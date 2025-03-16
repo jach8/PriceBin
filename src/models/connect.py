@@ -67,6 +67,16 @@ class data:
             The converted target. 
         """
         return np.where(x > thresh, buy, np.where(x < -thresh, sell, hold))
+
+    def anomaly_convert(self, x, thresh=0.02, anom = 1, norm = 0):
+            """
+            Convert the target to anomaly detection. 
+            Args:
+                x: The target to convert. 
+            Returns:
+                The converted target. 
+            """
+            return np.where(np.abs(x) > thresh, anom, norm)
     
     def numeric_df(self, df):
         """
@@ -133,6 +143,8 @@ class data:
         """
         return TimeSeriesSplit(n_splits=n_splits).split(x, y)
 
+
+
 class setup(data):
     def __init__(self, df, feature_names, target_names, stock):
         super().__init__(df, feature_names, target_names, stock)
@@ -163,13 +175,12 @@ class setup(data):
         if not isinstance(self.features, pd.DataFrame) or self.features.empty:
             raise ValueError("Features DataFrame is empty or not properly initialized")
             
-        if not self.target_names:
-            raise ValueError("Target names must be specified")
+        # if not self.target_names:raise ValueError("Target names must be specified")
             
-        self.scaler = kwargs.get('scaler', MinMaxScaler())
+        self.scaler = kwargs.get('scaler', StandardScaler())
         self.discretizer = kwargs.get('discritize', False)
-        self.y_format = kwargs.get('y_format', 'binary')
-        self.test_size = kwargs.get('test_size', 0.2)
+        self.y_format = kwargs.get('y_format', 'anomaly_convert')  # Default to anomaly detection
+        self.test_size = kwargs.get('test_size', 0.1)
         
         # Scale features first
         self.features_scaled = pd.DataFrame(
@@ -208,28 +219,20 @@ class setup(data):
         
         # Handle different y_format cases
         target_data = self.df[self.target_names]
-        
-        if self.y_format == 'binary':
-            anoms = pd.DataFrame(
-                self.binary_convert(target_data, thresh=0.03, buy=1, sell=-1),
-                columns=self.target_names,
-                index=self.df.index
-            )
-        else:  # 'cont' or any other format
-            anoms = target_data.copy()
-            
+        func = getattr(self, self.y_format)
+        anoms = target_data.apply(func)
+
+        counts = np.unique(anoms, return_counts=True)
+        logger.debug(f"Target Initialized with {len(counts[0])} classes. The counts are: {dict(zip(*counts))}")
         # logger.debug(f"Target shape: {anoms.shape}")
             
         self.ytrain = anoms.loc[self.xtrain.index]
         self.ytest = anoms.loc[self.xtest.index]
         self.xtrain = self.features_scaled.loc[self.xtrain.index]  # Use scaled features
         self.xtest = self.features_scaled.loc[self.xtest.index]    # Use scaled features
-        
-        # logger.debug(f"Training set shape: {self.xtrain.shape}")
-        # logger.debug(f"Testing set shape: {self.xtest.shape}")
-            
-        return self
     
+        return self
+
     def merge_preds(self, trainpred, testpred, model_name='anomaly'):
         """Merge predictions with price data"""
         if not isinstance(trainpred, (pd.Series, pd.DataFrame)):
