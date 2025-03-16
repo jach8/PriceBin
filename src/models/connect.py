@@ -272,17 +272,10 @@ if __name__ == "__main__":
     # Test anomaly model
     sys.path.append(str(Path(__file__).resolve().parent))
     
-    from anom.model import anomaly_model
+    from anom.model_new import StackedAnomalyModel 
     from anom.view import viewer
-    model = viewer(
-        df=d['df'],
-        feature_names=d['features'],
-        target_names=d['target'],
-        stock=d['stock'],
-        verbose=True
-    )
-    model.initialize('STOCH|RSI|ATH|ATL')  # Initialize with EMA features only
-    model.fit()
+    
+    # Initialize and fit the anomaly model
+    anomaly_model = StackedAnomalyModel(d['df'], d['features'], d['target'], d['stock'])
+    anomaly_model.fit()
 
-    # Plot The result: 
-    model.general_plot()
