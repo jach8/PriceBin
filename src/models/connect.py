@@ -68,7 +68,7 @@ class data:
         """
         return np.where(x > thresh, buy, np.where(x < -thresh, sell, hold))
 
-    def anomaly_convert(self, x, thresh=0.02, anom = 1, norm = 0):
+    def anomaly_convert(self, x, thresh=0.02, anom = -1, norm = 1):
             """
             Convert the target to anomaly detection. 
             Args:
@@ -251,6 +251,8 @@ class setup(data):
         trainpred = self.price_data.loc[self.xtrain.index].join(pred.loc[self.xtrain.index])
         testpred = self.price_data.loc[self.xtest.index].join(pred.loc[self.xtest.index])
         return trainpred, testpred
+
+
 if __name__ == "__main__":
     ############################################################################################################
     from pathlib import Path 

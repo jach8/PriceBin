@@ -203,7 +203,7 @@ class EnhancedViewer(StackedAnomalyModel):
         """Compare performance metrics across ensemble models"""
         metrics = {}
         
-        true_preds = np.where(self.ytest == 1, -1, 1)  # Map to -1 and 1 for consistency
+        true_preds = np.where(self.ytest == -1, -1, 1)  # Map to -1 and 1 for consistency
         # Calculate metrics for each model
         for name, model in self.base_models.items():
             preds = model.predict(self.xtest)
